@@ -1,0 +1,4 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<Response>
+    <Message>Your message has been successfully queued. We'll text you in {{.L8rDuration}}.</Message>
+</Response>
