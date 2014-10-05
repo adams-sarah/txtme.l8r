@@ -1,14 +1,10 @@
 package main
 
 import (
-	"fmt"
-	"io/ioutil"
 	"log"
 	"net/http"
 	"os"
-	"strings"
 	"text/template"
-	"time"
 )
 
 func main() {
@@ -22,52 +18,78 @@ func main() {
 }
 
 func MessageHandler(w http.ResponseWriter, req *http.Request) {
-	ok := validateReqMethod(w, req)
-	if !ok {
+	if req.Method != "POST" {
+		NewErrorWriter(
+			RequestMethodErrorMsg,
+			http.StatusBadRequest,
+			false,
+			nil,
+		).WriteTo(w)
 		return
 	}
 
-	body, err := ioutil.ReadAll(req.Body)
-	if err != nil {
-		log.Fatal(err)
+	if req.Header.Get("Content-Type") != "application/x-www-form-urlencoded" {
+		NewErrorWriter(
+			RequestContentTypeErrorMsg,
+			http.StatusBadRequest,
+			false,
+			nil,
+		).WriteTo(w)
+		return
 	}
 
-	splitBody := strings.Split(string(body), "&")
-
-	for _, bodyPart := range splitBody {
-		log.Println(string(bodyPart))
+	msg, ew := decodeMessage(w, req)
+	if ew != nil {
+		ew.WriteTo(w)
+		return
 	}
 
-	tmpDuration, _ := time.ParseDuration("2h45m")
-
-	err = writeXMLResponse(w, tmpDuration)
-	if err != nil {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
+	ew = writeXMLSuccess(w, msg.Body)
+	if ew != nil {
+		ew.WriteTo(w)
 	}
 }
 
-func validateReqMethod(w http.ResponseWriter, req *http.Request) bool {
-	if req.Method != "POST" {
-		errMsg := fmt.Sprintf(
-			"Invalid request method, %s. Please use POST.",
-			req.Method,
-		)
-
-		http.Error(w, errMsg, http.StatusBadRequest)
-		return false
-	}
-
-	return true
-}
-
-func writeXMLResponse(w http.ResponseWriter, duration time.Duration) error {
+func writeXMLSuccess(w http.ResponseWriter, body MessageBody) *ErrorWriter {
 	w.Header().Set("Content-Type", "text/xml")
 
-	tmplParams := map[string]string{"L8rDuration": duration.String()}
-	tmpl, err := template.ParseFiles("templates/message_response.xml")
+	tmpl, err := template.ParseFiles("templates/success.xml")
 	if err != nil {
-		return err
+		return NewErrorWriter(
+			RequestMethodErrorMsg,
+			http.StatusInternalServerError,
+			false,
+			err,
+		)
 	}
 
-	return tmpl.Execute(w, tmplParams)
+	err = tmpl.Execute(w, body)
+	if err != nil {
+		return NewErrorWriter(
+			RequestMethodErrorMsg,
+			http.StatusInternalServerError,
+			false,
+			err,
+		)
+	}
+
+	return nil
+}
+
+func writeXMLError(w http.ResponseWriter, ew *ErrorWriter) {
+	w.Header().Set("Content-Type", "text/xml")
+	log.Println("Writing XML Error")
+
+	tmpl, err := template.ParseFiles("templates/error.xml")
+	if err != nil {
+		http.Error(w, ServerErrorMsg, http.StatusInternalServerError)
+		return
+	}
+
+	err = tmpl.Execute(w, ew)
+	if err != nil {
+		http.Error(w, ServerErrorMsg, http.StatusInternalServerError)
+	}
+
+	return
 }
