@@ -6,6 +6,7 @@ import (
 	"log"
 	"net/http"
 	"os"
+	"strings"
 	"text/template"
 	"time"
 )
@@ -31,7 +32,11 @@ func MessageHandler(w http.ResponseWriter, req *http.Request) {
 		log.Fatal(err)
 	}
 
-	log.Println(string(body))
+	splitBody := strings.Split(string(body), "&")
+
+	for _, bodyPart := range splitBody {
+		log.Println(string(bodyPart))
+	}
 
 	tmpDuration, _ := time.ParseDuration("2h45m")
 
