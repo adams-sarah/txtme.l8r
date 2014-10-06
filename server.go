@@ -16,6 +16,7 @@ func main() {
 
 	http.HandleFunc("/message.xml", MessageHandler)
 	http.HandleFunc("/message/status", MessageStatusHandler)
+	http.HandleFunc("/status", StatusHandler)
 	http.ListenAndServe(":"+port, nil)
 }
 
@@ -82,6 +83,14 @@ func MessageStatusHandler(w http.ResponseWriter, req *http.Request) {
 
 	log.Println("MessageStatusHandler: Received message: ", string(b))
 
+}
+
+// Endpoint for Pingdom
+func StatusHandler(w http.ResponseWriter, req *http.Request) {
+	_, err := w.Write([]byte("OK"))
+	if err != nil {
+		log.Println("Error: PingHandler: ", err.Error())
+	}
 }
 
 func writeXMLSuccess(w http.ResponseWriter, body MessageBody) *ErrorWriter {

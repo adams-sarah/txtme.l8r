@@ -139,3 +139,21 @@ func TestMessageHandlerMalformedSMS(t *testing.T) {
 		t.Fatalf(`Expected response body to contain "Try something like,". Body was %s`, respBody)
 	}
 }
+
+func TestStatusHandler200(t *testing.T) {
+	request, err := http.NewRequest("GET", "/status", nil)
+	if err != nil {
+		t.Fatalf("Expected http.NewRequest not to return an error. Got: %v", err)
+	}
+
+	w := httptest.NewRecorder()
+	StatusHandler(w, request)
+
+	if w.Code != http.StatusOK {
+		t.Fatalf(
+			"Expected response code to be %d. Got %d",
+			http.StatusOK,
+			w.Code,
+		)
+	}
+}
