@@ -1,6 +1,7 @@
 package main
 
 import (
+	"io/ioutil"
 	"log"
 	"net/http"
 	"os"
@@ -14,6 +15,7 @@ func main() {
 	}
 
 	http.HandleFunc("/message.xml", MessageHandler)
+	http.HandleFunc("/message/status", MessageStatusHandler)
 	http.ListenAndServe(":"+port, nil)
 }
 
@@ -44,10 +46,42 @@ func MessageHandler(w http.ResponseWriter, req *http.Request) {
 		return
 	}
 
+	go msg.sendLater()
+
 	ew = writeXMLSuccess(w, msg.Body)
 	if ew != nil {
 		ew.WriteTo(w)
 	}
+}
+
+func MessageStatusHandler(w http.ResponseWriter, req *http.Request) {
+	if req.Method != "POST" {
+		NewErrorWriter(
+			RequestMethodErrorMsg,
+			http.StatusBadRequest,
+			false,
+			nil,
+		).WriteTo(w)
+		return
+	}
+
+	b, err := ioutil.ReadAll(req.Body)
+	defer req.Body.Close()
+
+	if err != nil {
+		ew := NewErrorWriter(
+			ParseRequestBodyErrorMsg,
+			http.StatusInternalServerError,
+			false,
+			err,
+		)
+
+		ew.WriteTo(w)
+		return
+	}
+
+	log.Println("MessageStatusHandler: Received message: ", string(b))
+
 }
 
 func writeXMLSuccess(w http.ResponseWriter, body MessageBody) *ErrorWriter {
@@ -78,7 +112,6 @@ func writeXMLSuccess(w http.ResponseWriter, body MessageBody) *ErrorWriter {
 
 func writeXMLError(w http.ResponseWriter, ew *ErrorWriter) {
 	w.Header().Set("Content-Type", "text/xml")
-	log.Println("Writing XML Error")
 
 	tmpl, err := template.ParseFiles("templates/error.xml")
 	if err != nil {

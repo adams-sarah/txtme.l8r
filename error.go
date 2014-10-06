@@ -22,6 +22,7 @@ func (ew *ErrorWriter) Error() string {
 
 const ( // HTTP request errors - only given to Twilio
 	ParseRequestBodyErrorMsg   = "Unexpected request body"
+	MissingFromErrorMsg        = "Missing 'From' field in request body"
 	RequestMethodErrorMsg      = "Unexpected request method. Please use POST."
 	RequestContentTypeErrorMsg = "Unexpected content type. Please use url-encoded form data."
 )

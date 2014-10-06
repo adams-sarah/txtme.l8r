@@ -2,10 +2,14 @@ package main
 
 import (
 	"io/ioutil"
+	"log"
 	"net/http"
 	"net/url"
+	"os"
 	"strings"
 	"time"
+
+	"github.com/sfreiberg/gotwilio"
 )
 
 const (
@@ -18,6 +22,7 @@ const MESSAGE_PART_DELIMITER = ":"
 type Message struct {
 	RawMessage url.Values
 	Body       MessageBody
+	UserNumber string
 }
 
 type MessageBody struct {
@@ -33,7 +38,7 @@ func decodeMessage(w http.ResponseWriter, req *http.Request) (msg Message, ew *E
 	if err != nil {
 		ew = NewErrorWriter(
 			ParseRequestBodyErrorMsg,
-			http.StatusBadRequest,
+			http.StatusInternalServerError,
 			false,
 			err,
 		)
@@ -54,6 +59,11 @@ func decodeMessage(w http.ResponseWriter, req *http.Request) (msg Message, ew *E
 	}
 
 	ew = (&msg).decodeBody()
+	if ew != nil {
+		return
+	}
+
+	ew = (&msg).setUserNumber()
 
 	return
 }
@@ -78,4 +88,42 @@ func (msg *Message) decodeBody() *ErrorWriter {
 	)
 
 	return nil
+}
+
+func (msg *Message) setUserNumber() *ErrorWriter {
+	msg.UserNumber = msg.RawMessage.Get("From")
+	if len(msg.UserNumber) == 0 {
+		return NewErrorWriter(MissingFromErrorMsg, http.StatusBadRequest, false, nil)
+	}
+
+	return nil
+}
+
+func (msg *Message) sendLater() {
+	time.Sleep(msg.Body.DelayTime)
+
+	twilio := gotwilio.NewTwilioClient(
+		os.Getenv("TWILIO_ACCOUNT_SID"),
+		os.Getenv("TWILIO_AUTH_TOKEN"),
+	)
+
+	smsResponse, ex, err := twilio.SendSMS(
+		os.Getenv("TWILIO_PHONE_NUMBER"),
+		msg.UserNumber,
+		msg.Body.ReminderMessage,
+		os.Getenv("BASE_URI")+"/message/status",
+		"",
+	)
+
+	if ex != nil {
+		log.Printf("Error: Message.sendLater: 'twilio.Exception' returned: %#v\n", *ex)
+	}
+
+	if err != nil {
+		log.Println("Error: Message.sendLater: ", err.Error())
+	}
+
+	if err == nil && ex == nil {
+		log.Printf("Sent SMS. Response: %#v\n", *smsResponse)
+	}
 }
